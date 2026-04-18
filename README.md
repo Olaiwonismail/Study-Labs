@@ -12,6 +12,10 @@ This is not a thin chat wrapper around an LLM. The app implements a multi-stage 
 - **LangChain + Gemini Stack**: LangChain loaders/splitters/vector store orchestration sit on top of Gemini embedding and chat models.
 - **Tool-Calling Agent for Outlines**: Outline generation uses a map-reduce style summarization workflow and a LangChain agent tool (`submit_outline`) to produce structured course topology.
 
+  ## 🎥 Demo
+
+[![Study Labs Demo](https://img.youtube.com/vi/c4k9S9z3M78/maxresdefault.jpg)](https://youtu.be/c4k9S9z3M78)
+
 ## 🚀 Features
 
 - ** Learning Paths**: AI-generated course outlines and lessons based on user inputs and uploaded documents.
