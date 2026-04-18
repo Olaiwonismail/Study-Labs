@@ -2,6 +2,16 @@
 
 Study Labs is a comprehensive personalized learning platform that leverages Artificial Intelligence to create adaptive learning experiences. It combines a modern, pastel-themed frontend with a powerful backend capable of processing documents and generating tailored course content, quizzes, and tutoring sessions.
 
+## Why This Is Technically Interesting
+
+This is not a thin chat wrapper around an LLM. The app implements a multi-stage retrieval-augmented learning system with user-isolated vector search, async ingestion, and tool-driven outline synthesis.
+
+- **RAG Pipeline**: Uploaded PDFs and YouTube transcripts are parsed, chunked, embedded, and indexed, then retrieved at query-time to ground tutor/chat/quiz generation.
+- **Qdrant Vector Search**: Context retrieval uses similarity search with metadata filters (`metadata.user_id`) so each user only queries their own knowledge base.
+- **Async ETL + Ingestion**: File extraction and YouTube transcript processing run concurrently with `asyncio` + worker threads for higher throughput.
+- **LangChain + Gemini Stack**: LangChain loaders/splitters/vector store orchestration sit on top of Gemini embedding and chat models.
+- **Tool-Calling Agent for Outlines**: Outline generation uses a map-reduce style summarization workflow and a LangChain agent tool (`submit_outline`) to produce structured course topology.
+
 ## 🚀 Features
 
 - ** Learning Paths**: AI-generated course outlines and lessons based on user inputs and uploaded documents.
@@ -11,6 +21,63 @@ Study Labs is a comprehensive personalized learning platform that leverages Arti
 - **Progress Tracking**: Visual indicators for course completion and lesson progress.
 - **Clean & Modern UI**: A user-friendly interface built with Next.js and Tailwind CSS, featuring a soothing pastel color palette.
 - **Math Support**: Rendering of mathematical equations using KaTeX.
+
+## How It Works (Technical Flow)
+
+1. **Ingestion API**
+    `POST /upload_pdfs` accepts PDFs, optional YouTube URLs, and a required `user_id`.
+
+2. **Async ETL**
+    - PDFs are parsed page-by-page (text + embedded images via PyMuPDF).
+    - YouTube transcripts are loaded via LangChain's `YoutubeLoader`.
+    - Content is split with `RecursiveCharacterTextSplitter` (`chunk_size=2000`, overlap `200`).
+    - Processing runs concurrently using `asyncio.gather(...)` and `asyncio.to_thread(...)`.
+
+3. **Embedding + Indexing**
+    - Chunks are embedded with `GoogleGenerativeAIEmbeddings` (`text-embedding-004`).
+    - Vectors are stored in Qdrant through `QdrantVectorStore`.
+    - Each chunk gets `metadata.user_id` for strict user-level context isolation.
+
+4. **Retrieval-Augmented Generation**
+    - Tutor/chat/quiz endpoints call user-scoped retrieval (`search_for_user`) with a Qdrant metadata filter.
+    - Retrieved chunks are injected into prompts to ground responses.
+    - Tutor can route to a vision-capable model when retrieved chunks include embedded image data.
+
+5. **Outline Synthesis (Map-Reduce + Tool Calling)**
+    - Large corpora are summarized in batches to avoid context overflow.
+    - Summaries are reduced into a unified outline by a LangChain agent.
+    - The final structure is emitted through a typed tool call (`submit_outline`) for predictable output shape.
+
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+  U[User in Next.js UI] --> API[Next.js API Routes]
+  API --> FAST[FastAPI Backend]
+
+  FAST --> IN[Async Ingestion and ETL]
+  IN --> PDF[PDF Parser and Image Extraction]
+  IN --> YT[YouTube Transcript Loader]
+  PDF --> SPLIT[Chunking: RecursiveCharacterTextSplitter]
+  YT --> SPLIT
+
+  SPLIT --> EMB[Gemini Embeddings: text-embedding-004]
+  EMB --> QD[(Qdrant Vector Store)]
+
+  FAST --> RET[User-Scoped Retrieval]
+  RET -->|metadata.user_id filter| QD
+
+  RET --> LLM[Gemini Chat and Vision Models]
+  LLM --> TUT[Tutor JSON Lesson]
+  LLM --> QUIZ[Quiz JSON Flashcards]
+  LLM --> CHAT[Chat Answer]
+
+  IN --> OUTL[Outline Pipeline]
+  OUTL --> MAP[Map: Batch Summaries]
+  MAP --> RED[Reduce: Unified Topic Graph]
+  RED --> TOOL[LangChain Tool Call: submit_outline]
+  TOOL --> COURSE[Course Outline Response]
+```
 
 ## 🛠️ Tech Stack
 
@@ -25,9 +92,11 @@ Study Labs is a comprehensive personalized learning platform that leverages Arti
 ### Backend
 - **Framework**: [FastAPI](https://fastapi.tiangolo.com/)
 - **Language**: Python
-- **AI/LLM**: Google Gemini (via `google-ai-generativelanguage`), LangChain (implied)
-- **Vector Store**: Qdrant / ChromaDB / Faiss (for document embeddings and retrieval)
-- **Document Processing**: PDF loaders, YouTube transcript loaders
+- **AI/LLM**: Gemini (`gemini-2.5-flash-lite`) via LangChain
+- **Embeddings**: Gemini `text-embedding-004`
+- **Vector Store**: Qdrant Cloud (`langchain_qdrant` integration)
+- **Orchestration**: LangChain loaders, splitters, vector store, agent tool-calling
+- **Async Data Pipeline**: `asyncio` + threaded loaders for concurrent file and YouTube processing
 
 ## 📂 Project Structure
 
