@@ -11,15 +11,32 @@ dotenv.load_dotenv()
 # Collection name constant
 COLLECTION_NAME = "test"
 
+
+def _get_env(*keys: str) -> str | None:
+    """Return the first non-empty environment value from keys."""
+    for key in keys:
+        value = os.getenv(key)
+        if value:
+            return value
+    return None
+
 # 1. Initialize ONLY the Cloud Client
+qdrant_url = _get_env("QDRANT_CLIENT_URL", "QdrantClient_url")
+qdrant_api_key = _get_env("QDRANT_CLIENT_API_KEY", "QdrantClient_api_key")
+
+if not qdrant_url:
+    raise RuntimeError(
+        "Missing Qdrant URL. Set QDRANT_CLIENT_URL in backend/.env (or env vars in Docker)."
+    )
+
 client = QdrantClient(
-    url=os.getenv("QdrantClient_url"), 
-    api_key=os.getenv("QdrantClient_api_key")
+    url=qdrant_url,
+    api_key=qdrant_api_key,
 )
 
-# 2. Get vector size dynamically
-# Fixed size for Gemini Embeddings - avoids startup API call failure
-vector_size = 768 
+# 2. Embedding vector size (override via env if needed)
+# gemini-embedding-001 defaults to 3072 dimensions.
+vector_size = int(os.getenv("EMBEDDING_VECTOR_SIZE", "3072"))
 
 # 3. Create or recreate the collection ON THE CLOUD
 # Check if existing collection has wrong dimensions and recreate if needed
