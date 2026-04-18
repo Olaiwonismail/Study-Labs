@@ -1,6 +1,6 @@
-# Scaffold-Ai
+# Study Labs
 
-Scaffold-Ai is a comprehensive personalized learning platform that leverages Artificial Intelligence to create adaptive learning experiences. It combines a modern, pastel-themed frontend with a powerful backend capable of processing documents and generating tailored course content, quizzes, and tutoring sessions.
+Study Labs is a comprehensive personalized learning platform that leverages Artificial Intelligence to create adaptive learning experiences. It combines a modern, pastel-themed frontend with a powerful backend capable of processing documents and generating tailored course content, quizzes, and tutoring sessions.
 
 ## 🚀 Features
 
@@ -32,7 +32,7 @@ Scaffold-Ai is a comprehensive personalized learning platform that leverages Art
 ## 📂 Project Structure
 
 ```
-Scaffold-Ai/
+Study-Labs/
 ├── backend/                 # FastAPI Backend
 │   ├── app.py              # Main application entry point
 │   ├── llm_services/       # AI/LLM logic (bot, outline generation)
@@ -59,8 +59,8 @@ Scaffold-Ai/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Olaiwonismail/Scaffold-Ai.git
-cd Scaffold-Ai
+git clone https://github.com/Olaiwonismail/Study-Labs.git
+cd Study-Labs
 ```
 
 ### 2. Backend Setup

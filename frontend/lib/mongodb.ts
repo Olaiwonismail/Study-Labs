@@ -1,7 +1,7 @@
 import { MongoClient, type Document } from "mongodb"
 
 const uri = process.env.MONGODB_URI
-const dbName = process.env.MONGODB_DB || "scaffold_ai"
+const dbName = process.env.MONGODB_DB || "study_labs"
 
 if (!uri) {
   throw new Error("MONGODB_URI is not set")
