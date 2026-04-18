@@ -1,5 +1,14 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, Filter, FieldCondition, MatchValue, PointsSelector, FilterSelector
+from qdrant_client.models import (
+    Distance,
+    VectorParams,
+    Filter,
+    FieldCondition,
+    MatchValue,
+    PointsSelector,
+    FilterSelector,
+    PayloadSchemaType,
+)
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.documents import Document
 from tools.embeddings import embeddings
@@ -10,6 +19,7 @@ dotenv.load_dotenv()
 
 # Collection name constant
 COLLECTION_NAME = "test"
+USER_ID_PAYLOAD_FIELD = "metadata.user_id"
 
 
 def _get_env(*keys: str) -> str | None:
@@ -69,19 +79,50 @@ vector_store = QdrantVectorStore(
     embedding=embeddings,
 )
 
-# 5. Create payload index for user_id filtering (required by Qdrant for filtered searches)
-try:
-    from qdrant_client.models import PayloadSchemaType
+def _payload_schema_type_value(field_schema) -> str:
+    """Extract payload field type from Qdrant schema objects/dicts across client versions."""
+    if field_schema is None:
+        return ""
+    if isinstance(field_schema, dict):
+        data_type = field_schema.get("data_type") or field_schema.get("type")
+    else:
+        data_type = getattr(field_schema, "data_type", None) or getattr(field_schema, "type", None)
+    return str(data_type).lower() if data_type is not None else ""
+
+
+def has_user_id_payload_index() -> bool:
+    """Return True when metadata.user_id is indexed as a keyword payload field."""
+    collection_info = client.get_collection(COLLECTION_NAME)
+    payload_schema = getattr(collection_info, "payload_schema", None) or {}
+    field_schema = payload_schema.get(USER_ID_PAYLOAD_FIELD)
+    field_type = _payload_schema_type_value(field_schema)
+    return field_type.endswith("keyword")
+
+
+def ensure_user_id_payload_index() -> None:
+    """Create and verify payload index used by user-scoped filtering."""
+    if has_user_id_payload_index():
+        print(f"Payload index already exists for {USER_ID_PAYLOAD_FIELD}")
+        return
+
     client.create_payload_index(
         collection_name=COLLECTION_NAME,
-        field_name="metadata.user_id",
+        field_name=USER_ID_PAYLOAD_FIELD,
         field_schema=PayloadSchemaType.KEYWORD,
+        wait=True,
     )
-    print("✅ Created payload index for metadata.user_id")
-except Exception as e:
-    # Index might already exist
-    if "already exists" not in str(e).lower():
-        print(f"⚠️ Payload index warning: {e}")
+
+    if not has_user_id_payload_index():
+        raise RuntimeError(
+            f"Failed to verify payload index for {USER_ID_PAYLOAD_FIELD}. "
+            "Filtered searches will fail until the index exists."
+        )
+
+    print(f"Created payload index for {USER_ID_PAYLOAD_FIELD}")
+
+
+# 5. Ensure payload index for user_id filtering (required by Qdrant for filtered searches)
+ensure_user_id_payload_index()
 
 print("Vector Store successfully connected to Cloud!")
 
@@ -119,11 +160,23 @@ def search_for_user(query: str, user_id: str, k: int = 4) -> List[Document]:
         ]
     )
     
-    results = vector_store.similarity_search(
-        query=query,
-        k=k,
-        filter=user_filter
-    )
+    try:
+        results = vector_store.similarity_search(
+            query=query,
+            k=k,
+            filter=user_filter
+        )
+    except Exception as e:
+        # Self-heal once if deployment/environment race caused missing payload index.
+        if "index required but not found" in str(e).lower() and USER_ID_PAYLOAD_FIELD in str(e):
+            ensure_user_id_payload_index()
+            results = vector_store.similarity_search(
+                query=query,
+                k=k,
+                filter=user_filter
+            )
+        else:
+            raise
     print(f"🔍 Found {len(results)} documents for user: {user_id}")
     return results
 
@@ -167,6 +220,7 @@ def clear_collection() -> bool:
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
         )
+        ensure_user_id_payload_index()
         print(f"🗑️ Cleared entire collection: {COLLECTION_NAME}")
         return True
     except Exception as e:
