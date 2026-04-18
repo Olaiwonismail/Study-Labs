@@ -14,7 +14,9 @@ This is not a thin chat wrapper around an LLM. The app implements a multi-stage 
 
   ## 🎥 Demo
 
-[![Study Labs Demo](https://img.youtube.com/vi/c4k9S9z3M78/maxresdefault.jpg)](https://youtu.be/c4k9S9z3M78)
+https://github.com/user-attachments/assets/90e2c84e-5410-4abb-8f32-ef9353d1531f
+
+
 
 ## 🚀 Features
 
